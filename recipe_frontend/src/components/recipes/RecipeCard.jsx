@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useContext, useMemo } from "react";
 import { Link } from "react-router-dom";
+import { FavoritesContext } from "../../context/FavoritesContext";
 
 /**
  * PUBLIC_INTERFACE
@@ -11,7 +12,9 @@ import { Link } from "react-router-dom";
  *   }
  */
 export default function RecipeCard({ recipe }) {
-  if (!recipe) return null;
+  // Ensure a stable default object so hooks are always called
+  const safeRecipe = recipe || {};
+  const { isFavorited, toggleFavorite } = useContext(FavoritesContext);
 
   const {
     id,
@@ -22,7 +25,25 @@ export default function RecipeCard({ recipe }) {
     calories,
     rating,
     description,
-  } = recipe;
+  } = safeRecipe;
+
+  const fav = useMemo(() => {
+    if (!id) return false;
+    return isFavorited(id);
+  }, [id, isFavorited]);
+
+  const onToggle = async (e) => {
+    e.preventDefault(); // prevent navigation when clicking heart
+    e.stopPropagation();
+    if (!id) return;
+    try {
+      await toggleFavorite(id);
+    } catch (err) {
+      alert(err?.response?.data?.message || err?.message || "Failed to update favorite.");
+    }
+  };
+
+  if (!recipe) return null;
 
   return (
     <div className="recipe-card" style={styles.card}>
@@ -39,6 +60,24 @@ export default function RecipeCard({ recipe }) {
             <div style={styles.placeholder}>No Image</div>
           )}
           {category && <span style={styles.category}>{category}</span>}
+          <button
+            onClick={onToggle}
+            aria-pressed={fav}
+            aria-label={fav ? "Remove from favorites" : "Add to favorites"}
+            style={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              borderRadius: 999,
+              padding: "6px 10px",
+              border: "1px solid #ffb4a1",
+              background: fav ? "#ffe2db" : "#fff",
+              boxShadow: "var(--shadow)",
+              cursor: "pointer",
+            }}
+          >
+            {fav ? "❤️" : "🤍"}
+          </button>
         </div>
         <div style={styles.body}>
           <h3 style={styles.title}>{title}</h3>

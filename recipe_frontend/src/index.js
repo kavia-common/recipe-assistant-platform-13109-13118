@@ -5,6 +5,7 @@ import './index.css';
 import './styles/layout.css';
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
+import { FavoritesProvider } from './context/FavoritesContext';
 
 /**
  * PUBLIC_INTERFACE
@@ -17,7 +18,9 @@ root.render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <FavoritesProvider>
+          <App />
+        </FavoritesProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>

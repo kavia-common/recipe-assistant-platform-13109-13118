@@ -6,8 +6,8 @@ import Register from '../pages/Register';
 import Home from '../pages/Home';
 import Search from '../pages/Search';
 import RecipeDetails from '../pages/RecipeDetails';
+import Favorites from '../pages/Favorites';
 
-const FavoritesPage = () => <div className="page"><h1>Favorites</h1><p>Manage your saved recipes.</p></div>;
 const Chat = () => <div className="page"><h1>Chat Assistant</h1><p>Ask the AI for cooking help and meal planning.</p></div>;
 
 // PUBLIC_INTERFACE
@@ -22,7 +22,7 @@ export default function AppRouter() {
         path="/favorites"
         element={
           <ProtectedRoute>
-            <FavoritesPage />
+            <Favorites />
           </ProtectedRoute>
         }
       />

@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import RecipeService from "../services/recipeService";
+import { FavoritesContext } from "../context/FavoritesContext";
 
 /**
  * PUBLIC_INTERFACE
@@ -12,9 +13,9 @@ import RecipeService from "../services/recipeService";
 export default function RecipeDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { isFavorited, toggleFavorite } = useContext(FavoritesContext);
 
   const [recipe, setRecipe] = useState(null);
-  const [fav, setFav] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -41,10 +42,15 @@ export default function RecipeDetails() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const toggleFav = () => {
-    // This is a stubbed favorite toggle for UI feedback.
-    // Integration with backend/user storage can be added later.
-    setFav((v) => !v);
+  const fav = useMemo(() => (id ? isFavorited(id) : false), [id, isFavorited]);
+
+  const onToggleFav = async () => {
+    try {
+      await toggleFavorite(id);
+    } catch (e) {
+      // Minimal error UI
+      alert(e?.response?.data?.message || e?.message || "Failed to update favorite.");
+    }
   };
 
   if (loading) return <div className="badge">Loading recipe…</div>;
@@ -66,7 +72,9 @@ export default function RecipeDetails() {
             {typeof rating !== "undefined" && <span className="badge">★ {rating}</span>}
           </div>
         </div>
-        <button onClick={toggleFav}>{fav ? "★ Favorited" : "☆ Add to Favorites"}</button>
+        <button onClick={onToggleFav} aria-pressed={fav} aria-label={fav ? "Remove from favorites" : "Add to favorites"}>
+          {fav ? "❤️ Favorited" : "🤍 Add to Favorites"}
+        </button>
       </div>
 
       <div style={styles.mediaWrap}>
