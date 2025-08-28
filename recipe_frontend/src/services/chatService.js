@@ -16,7 +16,7 @@
 // we request a full answer then emit it as a single assistant_message. Optionally, we simulate chunking.
 //
 
-import { PERPLEXITY_PROXY_URL } from "../config";
+import { getPerplexityProxyUrl } from "../config";
 
 /**
  * PUBLIC_INTERFACE
@@ -64,14 +64,28 @@ export function createChatService(_unusedPath = null) {
   function connect() {
     /**
      * Since this is REST-based, there is no persistent socket. We mark the service as "open"
-     * so the ChatWidget can indicate readiness. If a backend health check is needed, add it here.
+     * so the ChatWidget can indicate readiness. We also perform a lightweight health check to
+     * quickly surface configuration or connectivity issues (wrong endpoint, CORS, etc.).
      */
     setStatus("connecting");
-    // Simulate quick ready
-    setTimeout(() => {
-      setStatus("open");
-      emit("open");
-    }, 0);
+
+    const url = getPerplexityProxyUrl();
+    // Try a HEAD or GET health probe (backend can respond 200/204 for health)
+    // If it fails quickly, set error for the UI.
+    fetch(url, { method: "OPTIONS" })
+      .then(() => {
+        setStatus("open");
+        emit("open");
+      })
+      .catch(() => {
+        // Fallback: move to open but emit an error so UI shows banner and user can still retry
+        setStatus("open");
+        emit("open");
+        const err = new Error(
+          "AI service endpoint may be unreachable. Check REACT_APP_PERPLEXITY_PROXY_URL and backend."
+        );
+        emit("error", err);
+      });
   }
 
   // PUBLIC_INTERFACE
@@ -130,6 +144,7 @@ export function createChatService(_unusedPath = null) {
      * Expected proxy response (non-streaming simple mode):
      * { text: string } or { choices: [{ text: string }]} — adapt as needed.
      */
+    const url = getPerplexityProxyUrl();
     const body = {
       prompt: String(prompt),
       model: options.model || "llama-3.1-sonar-small-128k-chat",
@@ -137,26 +152,64 @@ export function createChatService(_unusedPath = null) {
       system: options.system || "You are a helpful cooking assistant.",
     };
 
-    const resp = await fetch(PERPLEXITY_PROXY_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // Do NOT attach API keys here. The server-side proxy must handle secrets securely.
-      },
-      body: JSON.stringify(body),
-      credentials: "include", // if your proxy requires cookies/session
-    });
+    // Add a client-side timeout to avoid long hangs
+    const controller = new AbortController();
+    const timeoutMs = Math.max(8000, Number(options.timeoutMs || 15000));
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+    let resp;
+    try {
+      resp = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          // Do NOT attach API keys here. The server-side proxy must handle secrets securely.
+        },
+        body: JSON.stringify(body),
+        credentials: "include", // if your proxy requires cookies/session
+        signal: controller.signal,
+      });
+    } catch (networkErr) {
+      const err = new Error(
+        "Network error contacting AI proxy. Verify REACT_APP_PERPLEXITY_PROXY_URL and backend availability."
+      );
+      err.cause = networkErr;
+      throw err;
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!resp.ok) {
-      const text = await resp.text().catch(() => "");
-      const err = new Error(`Perplexity request failed (${resp.status}) ${text}`);
+      let serverMsg = "";
+      try {
+        // Try JSON error first
+        const maybeJson = await resp.clone().json();
+        serverMsg =
+          maybeJson?.message ||
+          maybeJson?.detail ||
+          maybeJson?.error ||
+          JSON.stringify(maybeJson);
+      } catch {
+        try {
+          serverMsg = await resp.text();
+        } catch {
+          serverMsg = "";
+        }
+      }
+      const err = new Error(
+        `AI proxy responded with ${resp.status}${serverMsg ? `: ${serverMsg}` : ""}`
+      );
       err.status = resp.status;
       throw err;
     }
 
-    // Try to parse JSON structure and extract text
-    const data = await resp.json().catch(() => ({}));
-    // Common shapes: { text } or { choices: [{ text }]} or { answer }
+    // Parse successful JSON and extract content
+    let data = {};
+    try {
+      data = await resp.json();
+    } catch {
+      data = {};
+    }
     const answer =
       data.text ??
       data.answer ??
@@ -196,11 +249,16 @@ export function createChatService(_unusedPath = null) {
       emit("error", e);
       // Keep the UI functional; revert to open after brief moment to allow retry
       setTimeout(() => setStatus("open"), 500);
-      // Also forward a user-visible error message into the assistant stream if desired
+
+      const genericMsg =
+        "Sorry, I couldn't reach the AI service. Please try again in a moment.";
+      const actionableHint =
+        " If this keeps happening, check your environment variables: REACT_APP_PERPLEXITY_PROXY_URL and REACT_APP_API_BASE_URL.";
+
+      // Show a helpful message to the user without exposing internals
       emit("message", {
         type: "assistant_message",
-        text:
-          "Sorry, I couldn't reach the AI service. Please try again in a moment.",
+        text: `${genericMsg}${actionableHint}`,
       });
     }
   }
