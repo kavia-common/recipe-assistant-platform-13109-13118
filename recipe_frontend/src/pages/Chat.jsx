@@ -9,7 +9,7 @@ import { createChatService } from "../services/chatService";
 
 export default function Chat() {
   // Create a per-page ChatService instance
-  const chatService = useMemo(() => createChatService("/ws/chat"), []);
+  const chatService = useMemo(() => createChatService(), []);
 
   return (
     <div className="page">

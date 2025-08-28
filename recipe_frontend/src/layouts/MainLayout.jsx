@@ -20,7 +20,7 @@ export default function MainLayout({ children }) {
   const onChatPage = location.pathname === '/chat';
 
   // Single ChatService instance shared by floating widget to preserve context across pages
-  const chatService = useMemo(() => createChatService('/ws/chat'), []);
+  const chatService = useMemo(() => createChatService(), []);
   const [dockOpen, setDockOpen] = useState(false);
 
   return (

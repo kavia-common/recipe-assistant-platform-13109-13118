@@ -51,3 +51,14 @@ export function resolveWebSocketUrl(path = "/ws") {
   // Last-resort fallback
   return path;
 }
+
+/**
+ * PUBLIC_INTERFACE
+ * Perplexity integration configuration.
+ * IMPORTANT: Do NOT hardcode secrets in frontend. This should point to a secure proxy endpoint
+ * in your backend such as "/api/ai/perplexity", where the server attaches the Perplexity API key.
+ *
+ * If you must change it, set REACT_APP_PERPLEXITY_PROXY_URL at build/run time.
+ */
+export const PERPLEXITY_PROXY_URL =
+  process.env.REACT_APP_PERPLEXITY_PROXY_URL || "/api/ai/perplexity";

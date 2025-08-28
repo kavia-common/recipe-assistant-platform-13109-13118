@@ -1,38 +1,45 @@
 //
-// ChatService: manages a single WebSocket connection to the chatbot backend.
-// Uses REACT_APP_WS_BASE_URL (via resolveWebSocketUrl) and attaches Authorization if token exists.
-// Provides a small event emitter API to subscribe to connection state and messages.
+// ChatService (REST version for Perplexity):
+// This implementation posts user messages to a secure proxy endpoint that talks to Perplexity.
+// The API key must be handled server-side. Frontend never hardcodes the key.
+//
+// Events:
+// - status: "idle" | "connecting" | "open" | "closing" | "closed" | "error"
+//   We simulate "open" for UX purposes when ready to send/receive.
+// - message: emits payloads compatible with ChatWidget:
+//    { type: "assistant_delta", text } and { type: "assistant_done" } or
+//    { type: "assistant_message", text }
+// - error: emits Error objects
+//
+// Note: For true streaming, your backend proxy can implement Server-Sent Events (SSE) or chunked
+// transfer and transform Perplexity response into small deltas. Here we implement a simple approach:
+// we request a full answer then emit it as a single assistant_message. Optionally, we simulate chunking.
 //
 
-import { resolveWebSocketUrl } from "../config";
-import { getToken } from "../utils/http";
+import { PERPLEXITY_PROXY_URL } from "../config";
 
 /**
  * PUBLIC_INTERFACE
- * Create a ChatService instance that manages a WebSocket connection to a given path.
- * Consumers should keep a single instance per UI scope (e.g., app-level or page).
+ * Create a ChatService instance that communicates via HTTPS REST to a Perplexity proxy endpoint.
+ * Consumers should keep a single instance per UI scope.
  *
  * Usage:
  *   const chat = createChatService();
- *   chat.connect(); // or will auto-connect on first send()
+ *   chat.connect(); // sets status to "open"
  *   chat.onMessage((msg) => { ... });
  *   chat.sendUserMessage("Hello");
  *   chat.disconnect();
  */
-export function createChatService(path = "/ws/chat") {
-  let socket = null;
+export function createChatService(_unusedPath = null) {
   let status = "idle"; // idle | connecting | open | closing | closed | error
-  let reconnectAttempts = 0;
-  let reconnectTimer = null;
-  let manualClose = false;
 
   // Event subscribers
   const listeners = {
     open: new Set(),
     close: new Set(),
     error: new Set(),
-    message: new Set(), // receives parsed message objects or raw strings
-    status: new Set(), // receives status changes
+    message: new Set(),
+    status: new Set(),
   };
 
   function emit(type, payload) {
@@ -42,7 +49,7 @@ export function createChatService(path = "/ws/chat") {
       try {
         cb(payload);
       } catch {
-        // ignore subscriber errors
+        // ignore subscriber errors to avoid crashing UI
       }
     });
   }
@@ -53,87 +60,30 @@ export function createChatService(path = "/ws/chat") {
     emit("status", next);
   }
 
-  function buildUrl() {
-    // Build full ws URL, append auth token if present
-    const base = resolveWebSocketUrl(path);
-    const token = getToken();
-    if (token) {
-      const u = new URL(base, typeof window !== "undefined" ? window.location.href : "http://localhost");
-      u.searchParams.set("token", token); // fallback method if Authorization header not supported by WS server
-      return u.toString();
-    }
-    return base;
-  }
-
+  // PUBLIC_INTERFACE
   function connect() {
-    if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
-      return;
-    }
-    manualClose = false;
+    /**
+     * Since this is REST-based, there is no persistent socket. We mark the service as "open"
+     * so the ChatWidget can indicate readiness. If a backend health check is needed, add it here.
+     */
     setStatus("connecting");
-    const url = buildUrl();
-
-    // Some servers support token in query. If your server supports headers via subprotocols,
-    // adapt here. Browsers can't set arbitrary headers on WebSocket handshake.
-    socket = new WebSocket(url);
-
-    socket.onopen = () => {
+    // Simulate quick ready
+    setTimeout(() => {
       setStatus("open");
-      reconnectAttempts = 0;
       emit("open");
-    };
-
-    socket.onmessage = (event) => {
-      let payload = event.data;
-      try {
-        // Try parse JSON, fallback to string
-        const parsed = JSON.parse(event.data);
-        payload = parsed;
-      } catch {
-        // keep as string
-      }
-      emit("message", payload);
-    };
-
-    socket.onerror = (err) => {
-      setStatus("error");
-      emit("error", err);
-    };
-
-    socket.onclose = () => {
-      emit("close");
-      setStatus("closed");
-      // Try reconnect unless manually closed
-      if (!manualClose) scheduleReconnect();
-    };
+    }, 0);
   }
 
-  function scheduleReconnect() {
-    // Exponential backoff capped to 5s
-    if (reconnectTimer) return;
-    const delay = Math.min(5000, 500 * Math.pow(2, reconnectAttempts++));
-    reconnectTimer = setTimeout(() => {
-      reconnectTimer = null;
-      connect();
-    }, delay);
-  }
-
+  // PUBLIC_INTERFACE
   function disconnect() {
-    manualClose = true;
-    if (reconnectTimer) {
-      clearTimeout(reconnectTimer);
-      reconnectTimer = null;
-    }
-    if (socket) {
-      try {
-        setStatus("closing");
-        socket.close();
-      } catch {
-        // ignore
-      }
-      socket = null;
+    /**
+     * No persistent connection. We mark as closed for UI symmetry.
+     */
+    setStatus("closing");
+    setTimeout(() => {
       setStatus("closed");
-    }
+      emit("close");
+    }, 0);
   }
 
   // PUBLIC_INTERFACE
@@ -167,36 +117,101 @@ export function createChatService(path = "/ws/chat") {
     return () => listeners.status.delete(cb);
   }
 
-  // PUBLIC_INTERFACE
-  function sendRaw(data) {
-    /** Send a raw string/JSON-serializable object over the socket. Auto-connects if needed. */
-    if (!socket || socket.readyState === WebSocket.CLOSED) {
-      connect();
+  async function postToPerplexity(prompt, options = {}) {
+    /**
+     * Calls a secure proxy endpoint that integrates with Perplexity.
+     * The proxy should:
+     * - Read Perplexity API key from server-side env (never expose to client).
+     * - Call Perplexity REST API and return either a final text or stream chunks.
+     *
+     * Expected proxy request body (example):
+     * { prompt: string, model?: string, system?: string, stream?: boolean }
+     *
+     * Expected proxy response (non-streaming simple mode):
+     * { text: string } or { choices: [{ text: string }]} — adapt as needed.
+     */
+    const body = {
+      prompt: String(prompt),
+      model: options.model || "llama-3.1-sonar-small-128k-chat",
+      stream: false, // simple mode; enable true if your proxy supports streaming
+      system: options.system || "You are a helpful cooking assistant.",
+    };
+
+    const resp = await fetch(PERPLEXITY_PROXY_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        // Do NOT attach API keys here. The server-side proxy must handle secrets securely.
+      },
+      body: JSON.stringify(body),
+      credentials: "include", // if your proxy requires cookies/session
+    });
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      const err = new Error(`Perplexity request failed (${resp.status}) ${text}`);
+      err.status = resp.status;
+      throw err;
     }
-    const payload = typeof data === "string" ? data : JSON.stringify(data);
-    // Queue if not open yet
-    if (socket && socket.readyState === WebSocket.OPEN) {
-      socket.send(payload);
-    } else {
-      // Wait for open, then send once
-      const unsub = onOpen(() => {
-        try {
-          socket && socket.send(payload);
-        } finally {
-          unsub();
-        }
+
+    // Try to parse JSON structure and extract text
+    const data = await resp.json().catch(() => ({}));
+    // Common shapes: { text } or { choices: [{ text }]} or { answer }
+    const answer =
+      data.text ??
+      data.answer ??
+      data.choices?.[0]?.text ??
+      data.choices?.[0]?.message?.content ??
+      "";
+
+    return String(answer || "");
+  }
+
+  // PUBLIC_INTERFACE
+  async function sendUserMessage(text, metadata = {}) {
+    /**
+     * Sends user prompt to the Perplexity proxy and emits assistant response.
+     * Error handling emits error event and sets status to "error" momentarily.
+     */
+    const prompt = (text || "").trim();
+    if (!prompt) return;
+
+    // Ensure "open" status for UX; connect if still idle
+    if (status === "idle" || status === "closed") connect();
+
+    try {
+      const resultText = await postToPerplexity(prompt, metadata);
+
+      // Emit single final message by default
+      emit("message", { type: "assistant_message", text: resultText });
+
+      // If simulated streaming preferred, uncomment:
+      // for (const chunk of chunkString(resultText, 40)) {
+      //   emit("message", { type: "assistant_delta", text: chunk });
+      //   await new Promise(r => setTimeout(r, 20));
+      // }
+      // emit("message", { type: "assistant_done" });
+    } catch (e) {
+      setStatus("error");
+      emit("error", e);
+      // Keep the UI functional; revert to open after brief moment to allow retry
+      setTimeout(() => setStatus("open"), 500);
+      // Also forward a user-visible error message into the assistant stream if desired
+      emit("message", {
+        type: "assistant_message",
+        text:
+          "Sorry, I couldn't reach the AI service. Please try again in a moment.",
       });
     }
   }
 
-  // PUBLIC_INTERFACE
-  function sendUserMessage(text, metadata = {}) {
-    /**
-     * Send a user message following a common schema { type: "user_message", text, ... }.
-     * Adjust shape to your backend needs.
-     */
-    if (!text || !text.trim()) return;
-    sendRaw({ type: "user_message", text: String(text), ...metadata });
+  // Helper for simulated streaming (unused by default)
+  function chunkString(str, size) {
+    const chunks = [];
+    for (let i = 0; i < str.length; i += size) {
+      chunks.push(str.slice(i, i + size));
+    }
+    return chunks;
   }
 
   // PUBLIC_INTERFACE
@@ -213,7 +228,8 @@ export function createChatService(path = "/ws/chat") {
     onError,
     onMessage,
     onStatus,
-    sendRaw,
+    // sendRaw is a no-op in REST mode to preserve API shape
+    sendRaw: () => {},
     sendUserMessage,
     getStatus,
   };
