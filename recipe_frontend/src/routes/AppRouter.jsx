@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 
 // Simple route stubs
 const Home = () => <div className="page"><h1>Home</h1><p>Discover trending recipes and suggestions.</p></div>;
@@ -11,18 +11,16 @@ const Chat = () => <div className="page"><h1>Chat Assistant</h1><p>Ask the AI fo
 
 // PUBLIC_INTERFACE
 export default function AppRouter() {
-  /** Defines application routes using react-router-dom v6. */
+  /** Defines application routes using react-router-dom v6. Assumes a Router is provided higher in the tree. */
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/search" element={<Search />} />
-        <Route path="/recipe/:id" element={<RecipeDetails />} />
-        <Route path="/favorites" element={<Favorites />} />
-        <Route path="/auth" element={<Auth />} />
-        <Route path="/chat" element={<Chat />} />
-        <Route path="*" element={<Home />} />
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      <Route path="/" element={<Home />} />
+      <Route path="/search" element={<Search />} />
+      <Route path="/recipe/:id" element={<RecipeDetails />} />
+      <Route path="/favorites" element={<Favorites />} />
+      <Route path="/auth" element={<Auth />} />
+      <Route path="/chat" element={<Chat />} />
+      <Route path="*" element={<Home />} />
+    </Routes>
   );
 }
