@@ -3,11 +3,10 @@ import { Routes, Route } from 'react-router-dom';
 import ProtectedRoute from '../components/auth/ProtectedRoute';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
+import Home from '../pages/Home';
+import Search from '../pages/Search';
+import RecipeDetails from '../pages/RecipeDetails';
 
-// Simple route stubs
-const Home = () => <div className="page"><h1>Home</h1><p>Discover trending recipes and suggestions.</p></div>;
-const Search = () => <div className="page"><h1>Search</h1><p>Find recipes by ingredients, cuisine, or difficulty.</p></div>;
-const RecipeDetails = () => <div className="page"><h1>Recipe Details</h1><p>View detailed steps, ingredients, and tips.</p></div>;
 const FavoritesPage = () => <div className="page"><h1>Favorites</h1><p>Manage your saved recipes.</p></div>;
 const Chat = () => <div className="page"><h1>Chat Assistant</h1><p>Ask the AI for cooking help and meal planning.</p></div>;
 
