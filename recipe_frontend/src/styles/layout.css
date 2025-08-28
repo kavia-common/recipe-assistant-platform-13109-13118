@@ -1,0 +1,222 @@
+:root {
+  --primary: #FF7043;   /* Deep orange */
+  --secondary: #455A64; /* Blue grey */
+  --accent: #FFD54F;    /* Amber lighten */
+  --bg: #ffffff;
+  --bg-soft: #f6f8fa;
+  --text: #1a1a1a;
+  --muted: #6b7280;
+  --border: #e5e7eb;
+  --shadow: 0 6px 16px rgba(0,0,0,0.08);
+}
+
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body {
+  margin: 0;
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial, "Apple Color Emoji","Segoe UI Emoji";
+  color: var(--text);
+  background: var(--bg);
+}
+
+/* Header */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 24px;
+  background: linear-gradient(180deg, var(--secondary), #2f3a40);
+  color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: .2px;
+}
+.brand-mark {
+  font-size: 22px;
+}
+.brand-name {
+  font-size: 18px;
+}
+
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.nav-link {
+  color: #e8eef2;
+  text-decoration: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  transition: background .2s ease, color .2s ease, transform .1s ease;
+}
+.nav-link:hover {
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+}
+.nav-cta {
+  background: var(--primary);
+  color: #1a1a1a;
+  font-weight: 600;
+}
+.nav-cta:hover {
+  background: #ff845f;
+  color: #111827;
+}
+
+/* Layout structure */
+.layout-root {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.layout-body {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 24px;
+  padding: 20px 24px;
+  background: var(--bg-soft);
+  flex: 1;
+}
+
+.layout-sidebar {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  height: fit-content;
+}
+
+.layout-content {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  padding: 24px;
+  min-height: 60vh;
+}
+
+/* Sidebar */
+.sidebar {
+  padding: 16px;
+}
+.sidebar-section + .sidebar-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--border);
+}
+.sidebar-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--secondary);
+  text-transform: uppercase;
+  letter-spacing: .6px;
+}
+.sidebar-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.sidebar-link {
+  display: block;
+  padding: 8px 10px;
+  margin: 2px 0;
+  color: #374151;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: background .2s ease, color .2s;
+}
+.sidebar-link:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+/* Pages */
+.page h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  color: var(--secondary);
+}
+.page p {
+  margin: 0;
+  color: var(--muted);
+}
+
+/* Footer */
+.app-footer {
+  padding: 14px 24px;
+  border-top: 1px solid var(--border);
+  background: #fff;
+  color: #6b7280;
+  text-align: center;
+}
+
+/* Accent elements */
+button, .btn {
+  background: var(--primary);
+  color: #111827;
+  border: 1px solid #ff845f;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform .08s ease, box-shadow .2s ease, background .2s ease;
+  box-shadow: 0 4px 12px rgba(255,112,67,.25);
+}
+button:hover, .btn:hover {
+  transform: translateY(-1px);
+  background: #ff845f;
+}
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--accent);
+  color: #3b2f00;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .layout-body {
+    grid-template-columns: 1fr;
+  }
+  .layout-sidebar {
+    order: 2;
+  }
+  .layout-content {
+    order: 1;
+  }
+}
+
+@media (max-width: 640px) {
+  .nav {
+    gap: 6px;
+  }
+  .nav-link {
+    padding: 6px 10px;
+  }
+  .layout-body {
+    padding: 14px;
+    gap: 14px;
+  }
+  .layout-content {
+    padding: 18px;
+  }
+}
